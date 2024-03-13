@@ -1,0 +1,31 @@
+[package]
+edition = "2021"
+name = "documenso_pdf-sign"
+version = "0.0.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
+chrono = "0.4.31"
+cryptographic-message-syntax = "0.26.0"
+gcloud-sdk = { version = "0.23.1", features = ["google-cloud-kms-v1"] }
+hex = "0.4.3"
+napi = { version = "2.12.2", default-features = false, features = ["async", "napi4", "tokio_rt"] }
+napi-derive = "2.12.2"
+p12 = "0.6.3"
+pem = "3.0.3"
+rsa = "0.9.6"
+sha256 = "1.4.0"
+signature = "2.2.0"
+tokio = { version = "1", features = ["rt", "time"] }
+tonic = "0.10.2"
+x509-certificate = "0.23.1"
+
+[build-dependencies]
+napi-build = "2.0.1"
+
+[profile.release]
+lto = true
+strip = "symbols"
