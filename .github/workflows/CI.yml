@@ -173,11 +173,11 @@ jobs:
           echo "//npm.pkg.github.com/:_authToken=$GHPR_TOKEN" >> ~/.npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
 
-          if git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+$";
+          if git log -1 --pretty=%B | grep "^release: v[0-9]\+\.[0-9]\+\.[0-9]\+$";
           then
             npm publish --registry="//registry.npmjs.org/" --access public
             npm publish --registry="//npm.pkg.github.com/" --access public
-          elif git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
+          elif git log -1 --pretty=%B | grep "^release: v[0-9]\+\.[0-9]\+\.[0-9]\+";
           then
             npm publish --registry="//registry.npmjs.org/" --tag next --access public
             npm publish --registry="//npm.pkg.github.com/" --tag next --access public
