@@ -208,15 +208,28 @@ switch (platform) {
         }
         break;
       case 'arm':
-        localFileExisted = existsSync(join(__dirname, 'pdf-sign.linux-arm-gnueabihf.node'));
-        try {
-          if (localFileExisted) {
-            nativeBinding = require('./pdf-sign.linux-arm-gnueabihf.node');
-          } else {
-            nativeBinding = require('@documenso/pdf-sign-linux-arm-gnueabihf');
+        if (isMusl()) {
+          localFileExisted = existsSync(join(__dirname, 'pdf-sign.linux-arm-musleabihf.node'));
+          try {
+            if (localFileExisted) {
+              nativeBinding = require('./pdf-sign.linux-arm-musleabihf.node');
+            } else {
+              nativeBinding = require('@documenso/pdf-sign-linux-arm-musleabihf');
+            }
+          } catch (e) {
+            loadError = e;
           }
-        } catch (e) {
-          loadError = e;
+        } else {
+          localFileExisted = existsSync(join(__dirname, 'pdf-sign.linux-arm-gnueabihf.node'));
+          try {
+            if (localFileExisted) {
+              nativeBinding = require('./pdf-sign.linux-arm-gnueabihf.node');
+            } else {
+              nativeBinding = require('@documenso/pdf-sign-linux-arm-gnueabihf');
+            }
+          } catch (e) {
+            loadError = e;
+          }
         }
         break;
       case 'riscv64':
@@ -271,8 +284,11 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`);
 }
 
-const { signWithPrivateKey, signWithP12, signWithGCloud } = nativeBinding;
+const { signWithPrivateKey, signWithP12, signWithGCloud, signWithUsbToken, signWithHttp } =
+  nativeBinding;
 
 module.exports.signWithPrivateKey = signWithPrivateKey;
 module.exports.signWithP12 = signWithP12;
 module.exports.signWithGCloud = signWithGCloud;
+module.exports.signWithUsbToken = signWithUsbToken;
+module.exports.signWithHttp = signWithHttp;

@@ -12,6 +12,8 @@ pub enum CmsError {
   TimestampServerParseError,
   BuildSignedDataError,
   DigestError,
+  UsbTokenError,
+  HttpError,
 }
 
 impl std::error::Error for CmsError {}
@@ -35,6 +37,8 @@ impl fmt::Display for CmsError {
       CmsError::TimestampServerParseError => write!(f, "Failed to parse timestamp server"),
       CmsError::BuildSignedDataError => write!(f, "Failed to build signed data"),
       CmsError::DigestError => write!(f, "Failed to get digest"),
+      CmsError::UsbTokenError => write!(f, "USB token error"),
+      CmsError::HttpError => write!(f, "HTTP signing error"),
     }
   }
 }

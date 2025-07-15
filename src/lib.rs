@@ -1,5 +1,7 @@
 mod errors;
 mod gcloud_signer;
+mod http_signer;
+mod usb_token_signer;
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -8,6 +10,8 @@ use chrono;
 use cryptographic_message_syntax::{asn1::rfc5652, Bytes, Oid, SignedDataBuilder, SignerBuilder};
 use errors::CmsError;
 use gcloud_signer::GCloudSigner;
+use http_signer::HttpSigner;
+use usb_token_signer::UsbTokenSigner;
 use p12::PFX;
 use pem::{encode, Pem};
 use x509_certificate::{CapturedX509Certificate, InMemorySigningKeyPair}; // Add the log crate for better logging
@@ -36,10 +40,13 @@ pub fn sign_with_private_key(options: SignWithPrivateKeyOptions) -> Result<Buffe
   let x509_certs = CapturedX509Certificate::from_pem_multiple(cert.to_vec())
     .map_err(|_| CmsError::CertificateParseError)?;
 
+  // Ensure we have at least one certificate
+  let signing_cert = x509_certs.first().ok_or(CmsError::NoCertificate)?;
+
   let private_key_cert = InMemorySigningKeyPair::from_pkcs8_pem(&private_key)
     .map_err(|_| CmsError::PrivateKeyParseError)?;
 
-  let mut signer = SignerBuilder::new(&private_key_cert, x509_certs.first().unwrap().clone());
+  let mut signer = SignerBuilder::new(&private_key_cert, signing_cert.clone());
 
   if let Some(timestamp_server) = timestamp_server {
     signer = signer
@@ -142,8 +149,89 @@ pub fn sign_with_gcloud(options: SignWithGCloudOptions) -> Result<Buffer> {
   let x509_certs = CapturedX509Certificate::from_pem_multiple(cert.to_vec())
     .map_err(|_| errors::CmsError::CertificateParseError)?;
 
+  // Ensure we have at least one certificate
+  let signing_cert = x509_certs.first().ok_or(errors::CmsError::NoCertificate)?;
+
   let gcloud_signer = GCloudSigner::new(key_path.clone());
-  let mut signer = SignerBuilder::new(&gcloud_signer, x509_certs.first().unwrap().clone());
+  let mut signer = SignerBuilder::new(&gcloud_signer, signing_cert.clone());
+
+  if let Some(timestamp_server) = timestamp_server {
+    signer = signer
+      .time_stamp_url(timestamp_server)
+      .map_err(|_| CmsError::TimestampServerParseError)?;
+  }
+
+  create_signed_data(CreateSignedDataOptions {
+    content,
+    signer,
+    signing_time,
+    certs: Some(x509_certs),
+  })
+}
+
+#[napi(object)]
+#[derive(Default)]
+pub struct SignWithUsbTokenOptions {
+  pub content: Buffer,
+  pub cert: Buffer,
+  pub library_path: String,
+  pub slot_id: u32,
+  pub pin: String,
+  pub key_id: Buffer,
+  pub signing_time: Option<String>,
+  pub timestamp_server: Option<String>,
+}
+
+/// Sign data with USB token.
+#[napi(js_name = "signWithUsbToken")]
+pub fn sign_with_usb_token(options: SignWithUsbTokenOptions) -> Result<Buffer> {
+  let SignWithUsbTokenOptions {
+    content,
+    cert,
+    library_path,
+    slot_id,
+    pin,
+    key_id,
+    signing_time,
+    timestamp_server,
+  } = options;
+
+  let mut usb_signer = UsbTokenSigner::new(&library_path, slot_id as u64, &pin, key_id.to_vec())
+    .map_err(|_| errors::CmsError::UsbTokenError)?;
+
+  // Try to parse the provided certificate, if that fails or cert is empty, auto-retrieve from USB token
+  let x509_certs = if cert.is_empty() {
+    // Auto-retrieve certificate from USB token
+    let cert_data = usb_signer.retrieve_certificate()
+      .map_err(|_| errors::CmsError::CertificateParseError)?;
+
+    // Convert DER to PEM format
+    let pem_cert = pem::encode(&pem::Pem::new("CERTIFICATE", cert_data));
+
+    CapturedX509Certificate::from_pem_multiple(pem_cert.as_bytes().to_vec())
+      .map_err(|_| errors::CmsError::CertificateParseError)?
+  } else {
+    // Try to parse provided certificate, fall back to auto-retrieval if it fails
+    match CapturedX509Certificate::from_pem_multiple(cert.to_vec()) {
+      Ok(certs) => certs,
+      Err(_) => {
+        // Fall back to auto-retrieval
+        let cert_data = usb_signer.retrieve_certificate()
+          .map_err(|_| errors::CmsError::CertificateParseError)?;
+
+        // Convert DER to PEM format
+        let pem_cert = pem::encode(&pem::Pem::new("CERTIFICATE", cert_data));
+
+        CapturedX509Certificate::from_pem_multiple(pem_cert.as_bytes().to_vec())
+          .map_err(|_| errors::CmsError::CertificateParseError)?
+      }
+    }
+  };
+
+  // Ensure we have at least one certificate
+  let signing_cert = x509_certs.first().ok_or(errors::CmsError::NoCertificate)?;
+
+  let mut signer = SignerBuilder::new(&usb_signer, signing_cert.clone());
 
   if let Some(timestamp_server) = timestamp_server {
     signer = signer
@@ -193,4 +281,34 @@ fn create_signed_data<'a>(options: CreateSignedDataOptions<'a>) -> Result<Buffer
     .build_der()
     .map_err(|_| CmsError::BuildSignedDataError.into())
     .map(|data| Buffer::from(data))
+}
+
+#[napi(object)]
+#[derive(Default)]
+pub struct SignWithHttpOptions {
+  pub content: Buffer,
+  pub server_url: String,
+  pub auth_token: Option<String>,
+  pub signing_time: Option<String>,
+  pub timestamp_server: Option<String>,
+}
+
+/// Sign PDF via HTTP server.
+#[napi(js_name = "signWithHttp")]
+pub async fn sign_with_http(options: SignWithHttpOptions) -> Result<Buffer> {
+  let SignWithHttpOptions {
+    content,
+    server_url,
+    auth_token,
+    signing_time,
+    timestamp_server,
+  } = options;
+
+  let http_signer = HttpSigner::new(server_url, auth_token);
+
+  let signed_pdf = http_signer
+    .sign_pdf(&content, signing_time, timestamp_server)
+    .await?;
+
+  Ok(Buffer::from(signed_pdf))
 }
