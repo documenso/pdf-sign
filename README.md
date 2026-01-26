@@ -1,3 +1,8 @@
+
+> [!WARNING]
+> pdf-sign has been deprecated in favour of https://github.com/LibPDF-js/core which is a full featured PDF parsing, manipulation and signing library
+> with support for LTV and PaDES compliant signing.
+
 # @documenso/pdf-sign
 
 This package provides functionality to sign PDF documents using various signing methods, including private keys, P12 containers, and Google Cloud. It is designed to be used with the Documenso platform.
