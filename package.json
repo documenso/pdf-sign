@@ -1,6 +1,6 @@
 {
   "name": "@documenso/pdf-sign",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -27,6 +27,18 @@
     "prettier": "^3.2.5",
     "typescript": "^5.4.2"
   },
+  "dependencies": {
+    "@napi-rs/triples": "^1.1.0"
+  },
+  "optionalDependencies": {
+    "@documenso/pdf-sign-darwin-arm64": "0.1.1",
+    "@documenso/pdf-sign-darwin-x64": "0.1.1",
+    "@documenso/pdf-sign-linux-arm64-gnu": "0.1.1",
+    "@documenso/pdf-sign-linux-arm64-musl": "0.1.1",
+    "@documenso/pdf-sign-linux-x64-gnu": "0.1.1",
+    "@documenso/pdf-sign-linux-x64-musl": "0.1.1",
+    "@documenso/pdf-sign-win32-x64-msvc": "0.1.1"
+  },
   "engines": {
     "node": ">= 10"
   },
@@ -42,5 +54,10 @@
     "universal": "napi universal",
     "version": "napi version"
   },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
   "packageManager": "yarn@4.1.1"
 }
